@@ -1,0 +1,32 @@
+@import './styles/modeButton.css';
+@import './styles/button.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.App {
+  text-align: center;
+  background-color: white;
+}
+
+.ant-modal {
+  top: 25px !important;
+}
+.ant-tree-title {
+  word-break: break-all !important;
+}
+.ant-tree-list {
+  background-color: #dcdddf !important;
+}
+.ant-tree-checkbox {
+  align-self: start !important;
+  margin-top: 5px !important;
+}
+
+.ant-notification-notice-icon-warning {
+  color: #f66f1c !important;
+}
+.ant-notification-notice-progress {
+  border-bottom-color: #f66f1c !important;
+}

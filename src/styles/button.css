@@ -1,0 +1,12 @@
+/* .primary-button {
+    @apply border border-solid border-[#f66f1c] text-[#f66f1c]
+}
+.primary-button:hover {
+    @apply bg-primary border border-solid border-[#f66f1c] text-black
+} */
+.ant-btn-primary {
+    @apply bg-primary
+}
+.ant-btn-primary:hover {
+    @apply !bg-primary
+}

@@ -1,0 +1,16 @@
+.ant-tabs-tab {
+    border-radius: 0px !important;
+    border-bottom: 1px solid #f66f1c !important;
+    background: #949599 !important;
+    color: white !important;
+}
+.ant-tabs-nav::before{
+    border-bottom: 1px solid #f66f1c !important;
+}
+.ant-tabs-tab-active {
+    color: white !important;
+    border-bottom: none !important;
+    border-top: 3px solid #f66f1c !important;
+    border-left: 1px solid #f66f1c !important;
+    border-right: 1px solid #f66f1c !important;
+}
