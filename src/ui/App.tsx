@@ -796,7 +796,7 @@ export function App() {
         </section>
 
         <footer className="panel-foot">
-          Demo data is synthetic. Built by <a href="https://tariqali.dev" target="_blank" rel="noreferrer">Tariq Ali</a>. <a href="https://github.com/Tariqali13/3d-project-demo" target="_blank" rel="noreferrer">Source</a>
+          Demo data is synthetic. Built by <a href="https://tariqali.dev" target="_blank" rel="noreferrer">Tariq Ali</a>. <a href="https://github.com/Tariqali13/3d-groundwork" target="_blank" rel="noreferrer">Source</a>
         </footer>
       </aside>
 
