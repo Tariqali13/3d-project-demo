@@ -172,6 +172,6 @@ Most of my commercial engineering work is maintained in private employer/client 
 
 **Tariq Ali** — Senior Full-Stack Software Engineer
 
-- Portfolio: https://tariqali13.com
+- Portfolio: https://tariqali.dev
 - GitHub: https://github.com/Tariqali13
 - LinkedIn: https://www.linkedin.com/in/tariq-ali-116678156/
