@@ -122,6 +122,9 @@ export class Viewer {
     this.fit();
   }
 
+  /** A frame() request made while the canvas had no size (hidden tab or pane). */
+  private pendingFrame: [Bounds, 'oblique' | 'plan'] | null = null;
+
   private fit() {
     const { clientWidth: w, clientHeight: h } = this.host;
     if (!w || !h) return;
@@ -130,6 +133,11 @@ export class Viewer {
     const { left, right, top, bottom } = this.insets;
     this.camera.setViewOffset(w, h, (right - left) / 2, (bottom - top) / 2, w, h);
     this.camera.updateProjectionMatrix();
+    if (this.pendingFrame) {
+      const [b, view] = this.pendingFrame;
+      this.pendingFrame = null;
+      this.frame(b, view);
+    }
     this.requestRender();
   }
 
@@ -147,6 +155,7 @@ export class Viewer {
   private emitCamera() {
     const dist = this.camera.position.distanceTo(this.controls.target);
     const h = this.host.clientHeight || 1;
+    if (!Number.isFinite(dist)) return;
     const metresPerPixel = (2 * dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / h;
     const d = new THREE.Vector3().subVectors(this.controls.target, this.camera.position);
     const heading = (THREE.MathUtils.radToDeg(Math.atan2(d.x, d.y)) + 360) % 360;
@@ -390,6 +399,11 @@ export class Viewer {
   /** Frame a world bounding box from the south-west (oblique) or straight down (plan). */
   frame(b: Bounds, view: 'oblique' | 'plan' = 'oblique') {
     if (!this.origin) return;
+    if (!this.host.clientWidth || !this.host.clientHeight) {
+      // Nothing to fit into yet; do it as soon as the canvas gets a size.
+      this.pendingFrame = [b, view];
+      return;
+    }
     const cx = (b.minX + b.maxX) / 2 - this.origin.x;
     const cy = (b.minY + b.maxY) / 2 - this.origin.y;
     const cz = ((b.minZ + b.maxZ) / 2 - this.origin.z) * this.exaggeration;
