@@ -1,177 +1,95 @@
-# 3D Geospatial & CAD Viewer
+# Groundwork
 
-A browser-based engineering viewer for rendering and interacting with complex CAD and geospatial data using **React** and **Three.js**.
+Open survey and CAD data in the browser and measure it: LandXML terrain, DXF site plans, distances, areas, long sections, stockpile volumes and cut/fill against a design. Nothing is uploaded; files are read and processed on your machine.
 
-This project demonstrates performance-sensitive frontend engineering for spatial datasets, including DXF/LandXML-style geometry, terrain and surface visualization, measurements, coordinate transformations, elevation analysis, and large-file processing.
+**Live demo: [groundwork demo](https://groundwork-3d.onrender.com)** (opens with a synthetic site already loaded: rolling ground with a stockpile, a building pad design and a CAD site plan)
 
-> This repository is a technical demonstration. Production/client-specific data, credentials, private endpoints, and proprietary assets are intentionally excluded.
+![Cut/fill between existing ground and a pad design, with a long section through both](docs/overview.png)
 
-## What This Project Demonstrates
+## What it does
 
-- Rendering complex 2D/3D engineering geometry in the browser
-- Working with CAD/geospatial formats and coordinate systems
-- Building measurement and analysis tools on top of Three.js scenes
-- Processing large datasets without blocking the UI
-- Optimizing raycasting and geometry interaction
-- Combining 3D visualization with chart-based elevation/profile analysis
+| | |
+|---|---|
+| **Open** | LandXML 1.x TIN surfaces and ASCII DXF (lines, LW/2D/3D polylines with arcs, arcs, circles, points, 3D faces). Drag files onto the page or use *Open files*. |
+| **See** | Hillshaded terrain with elevation colouring, contours at any interval, the triangle mesh, drawing layers you can switch on and off, vertical exaggeration, oblique and plan views. |
+| **Measure** | Plan and slope distance, rise, grade and bearing. Plan area and perimeter. Elevation of every loaded surface under a point. |
+| **Section** | Cut a long section along any line through every surface, with cut and fill shaded between existing and design. Point at the chart to find the spot in 3D. Download as CSV. |
+| **Stockpile** | Volume above the average toe level or a fixed base, from a boundary you click or a closed line in the drawing. |
+| **Cut and fill** | Existing vs design totals (cut, fill, net) and a cut/fill heat map on the ground. |
+| **Export** | Contours as DXF, split into major and minor layers. |
 
-## Core Capabilities
+<p>
+  <img src="docs/stockpile.png" width="49%" alt="Stockpile volume measured from the toe line in the site plan" />
+  <img src="docs/plan.png" width="49%" alt="Plan view with a distance measurement" />
+</p>
 
-### 3D & CAD Visualization
+## How it works
 
-- Render line, polyline, point, face and surface-style geometry
-- Display terrain/surface meshes with configurable visual modes
-- Interactive zoom, pan, orbit and scene navigation
-- Wireframe and solid visualization modes
-- Efficient spatial interaction using Three.js acceleration utilities
+The interesting parts are about keeping survey numbers correct while rendering them fast.
 
-### Geospatial Processing
+**Coordinates stay in float64 until the GPU.** Survey data sits at coordinates like E 411 020.373, N 763 528.271. In float32 the spacing between representable values at 763 528 is 6.25 cm, so vertices snap, lines shimmer and picks are off by centimetres. Groundwork keeps every coordinate in `Float64Array`s for parsing, measurement and volumes, and only shifts to a local origin and narrows to float32 when building GPU buffers ([`core/origin.ts`](src/core/origin.ts)). Picks come back through the same origin, so the coordinates you read are the file's coordinates.
 
-- Coordinate transformation support with `proj4`
-- XML-based spatial data parsing
-- DXF parsing and geometry conversion
-- Terrain/surface normalization and spatial calculations
+**Volumes against a plane are exact.** Over a triangle, height above a plane is linear, so the prism volume is plan area times mean corner height. Triangles that cross the plane are clipped so cut and fill never cancel each other ([`core/volume.ts`](src/core/volume.ts)). Surface-to-surface cut/fill and volumes inside a drawn boundary are sampled on a grid sized to the job; the tests check the grid result against the exact one.
 
-### Measurement & Analysis
+**A spatial index answers "how high is the ground here?" in constant time.** Sections, volumes, draping and the heat map make hundreds of thousands of these queries. [`TinIndex`](src/core/tinIndex.ts) buckets triangles into a uniform grid stored as two flat arrays (CSR), and checks the last triangle hit first, so walking along a line or a grid row barely touches the index. A million lookups take about 0.2 s.
 
-- 2D and 3D distance measurement workflows
-- Area/geometry interaction patterns
-- Elevation/profile visualization with Chart.js
-- Surface-aware analysis patterns for engineering datasets
+**Heavy work runs in a Web Worker.** Parsing, contouring, sections and volumes run in [`engine.worker.ts`](src/engine/engine.worker.ts) behind a small typed RPC, so the 3D view never stalls. The [`Engine`](src/engine/engine.ts) is a plain class, so the tests drive it directly without a browser.
 
-### Performance
+**The 3D view renders only when something changes.** Picking uses a BVH ([three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh)). Contours come from marching triangles on the TIN itself, with no regridding. 2D linework drawn at z = 0, as most site plans are, is draped onto the ground and split where it leaves the surface instead of diving 80 m under it.
 
-Large engineering files can contain hundreds of thousands or millions of entities. The project therefore uses patterns such as:
-
-- browser-side geometry optimization
-- BVH-assisted spatial queries
-- Web Worker-compatible processing patterns
-- memory-conscious geometry handling
-- reduced main-thread blocking for computational work
-
-## Technology Stack
-
-### Frontend
-
-- **React 18**
-- **Three.js**
-- **React Three Fiber / Drei**
-- **Ant Design**
-- **Tailwind CSS**
-- **styled-components / Emotion**
-
-### Spatial & File Processing
-
-- `dxf-parser`
-- `three-dxf`
-- `fast-xml-parser`
-- `proj4`
-- `d3-delaunay`
-- `fflate` / `pako`
-- `jszip`
-
-### Visualization
-
-- `chart.js`
-- `react-chartjs-2`
-- `chartjs-plugin-zoom`
-
-### Performance & Geometry
-
-- `three-mesh-bvh`
-- Web Worker-compatible processing
-- custom geometry transformation utilities
-
-## Architecture
-
-A typical processing flow looks like this:
-
-```text
-Engineering File
-      |
-      v
-Parser / Format Adapter
-      |
-      v
-Coordinate + Geometry Normalization
-      |
-      v
-Three.js Geometry / Mesh Construction
-      |
-      +------> Spatial Index / Interaction Layer
-      |
-      v
-3D Scene
-      |
-      +------> Measurements
-      +------> Elevation / Profile Analysis
-      +------> Visualization Controls
+```
+src/
+  core/      geometry, local origin, TIN index, volumes, contours, sections, demo site generator
+  formats/   LandXML and DXF parsers, LandXML and DXF writers
+  engine/    analysis engine, worker, typed RPC client
+  viewer/    three.js scene: surfaces, linework, contours, picking, overlays
+  ui/        React app, title block, section chart, formatting
 ```
 
-The important architectural principle is to keep **file parsing**, **domain geometry**, **Three.js rendering**, and **analysis logic** separate enough that additional spatial formats can be supported without rewriting the entire viewer.
+## Correctness
 
-## Running Locally
+The tests check results against answers known in advance rather than snapshots of whatever the code produced:
 
-### Requirements
+- a 10 × 10 m block 3 m high is 300 m³; a tilted plane gives two 125 m³ wedges;
+- a cone's grid volume is within 0.5 % of the exact TIN volume, and the TIN within 1 % of πr²h/3;
+- a DXF bulge of 1 is a semicircle on the correct side, and a written arc reads back onto its circle;
+- LandXML points are read as *northing easting elevation*, and invisible faces are skipped;
+- float32 really does lose the millimetres that the local origin keeps;
+- the demo files are byte-for-byte reproducible from the seeded generator, which CI checks.
 
-- Node.js 20 or later
-- npm
+```bash
+npm test          # 40 tests
+npm run bench     # timings on the demo site
+```
 
-### Setup
+| Demo site (21,600 + 7,668 triangles) | Time |
+|---|---|
+| Parse existing ground, LandXML 1.3 MB | 260 ms |
+| Cut/fill, existing vs design | 120 ms |
+| Contours at 0.5 m | 9 ms |
+| 1,000,000 elevation lookups | 200 ms |
+
+<sub>Node 22, one core of a cloud VM. In the browser this all runs in the worker.</sub>
+
+## Run it
 
 ```bash
 npm install
-npm start
+npm run dev       # http://localhost:5173
+npm run build     # static site in dist/
+npm run samples   # regenerate public/samples from src/core/sample.ts
 ```
 
-The public showcase is intentionally self-contained and does not include a production backend, customer datasets, credentials, or private API endpoints. API-backed experiments should use a local, same-origin demo service with synthetic data only.
+Keyboard: `V` navigate, `I` inspect, `D` distance, `A` area, `P` section, `S` stockpile, `C` cut and fill, `Enter` finish a shape, `Backspace` remove the last point, `Esc` clear.
 
-### Production Build
+## Limits
 
-```bash
-npm run build
-```
+DXF must be ASCII (R12 or later). Blocks, text and hatches are counted and listed rather than drawn. LandXML surfaces need faces; point-only surfaces are not triangulated. Files up to 150 MB are accepted, since everything runs in the browser.
 
-## Engineering Challenges
+## About the demo data
 
-### Large Files
+The demo site is generated by [`src/core/sample.ts`](src/core/sample.ts): seeded noise for the ground, an analytic stockpile, and a pad whose 1:2 batters daylight into the existing surface. It sits in projected coordinates so the precision handling above is exercised exactly as it would be with real survey data. No client data is used anywhere in this repository.
 
-The most difficult part of browser-based CAD visualization is not drawing a small model—it is keeping the application usable as file size and geometry complexity increase.
+## Licence
 
-Important considerations include:
-
-- reducing unnecessary geometry allocations
-- avoiding repeated scene traversal
-- moving expensive calculations away from the main thread
-- limiting repeated raycasts
-- indexing geometry for faster spatial queries
-- progressively processing large datasets when practical
-
-### Coordinate Systems
-
-Engineering/CAD data frequently uses projected/local coordinates rather than ordinary latitude/longitude. The viewer therefore treats coordinate transformation as a first-class part of the data pipeline instead of assuming all inputs share the same coordinate system.
-
-### Measurement Accuracy
-
-Measurements must operate on normalized domain geometry rather than relying purely on what is visually displayed on-screen. This separation allows rendering choices such as scaling or flattening to remain independent from analytical calculations.
-
-## Why This Repository Is Public
-
-Most of my commercial engineering work is maintained in private employer/client repositories. This project is intended to demonstrate the type of frontend, visualization, geospatial, and performance engineering I have worked on without exposing confidential production systems.
-
-## Areas for Further Development
-
-- isolate parsers behind a formal adapter interface
-- add automated fixtures for supported spatial formats
-- expand Web Worker processing for large-file workflows
-- add benchmark datasets and performance measurements
-- strengthen test coverage around geometry/measurement calculations
-- migrate remaining legacy build configuration toward a more modern toolchain
-
-## Author
-
-**Tariq Ali** — Senior Full-Stack Software Engineer
-
-- Portfolio: https://tariqali.dev
-- GitHub: https://github.com/Tariqali13
-- LinkedIn: https://www.linkedin.com/in/tariq-ali-116678156/
+MIT. Built by [Tariq Ali](https://tariqali.dev).
