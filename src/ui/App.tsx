@@ -40,7 +40,7 @@ interface DatasetMeta {
   visible: boolean;
   triangles: number;
   color: string;
-  layers: { name: string; color: string; visible: boolean; count: number }[];
+  layers: { name: string; color: string; visible: boolean; count: number; faces?: boolean }[];
   skipped: Record<string, number>;
   drapedOn: string | null;
   closedLines: ClosedLine[];
@@ -180,7 +180,10 @@ export function App() {
             added.push({
               id: d.id, kind: 'drawing', name: d.name, file: d.file, bounds: d.bounds, visible: true,
               triangles: dr.faces ? dr.faces.indices.length / 3 : 0, color: '#1d2721',
-              layers: [...byLayer].map(([name, l]) => ({ name, color: l.color, visible: true, count: counts.get(name) ?? 0 })).sort((a, b) => a.name.localeCompare(b.name)),
+              layers: mergeFaceLayers(
+                [...byLayer].map(([name, l]) => ({ name, color: l.color, visible: true, count: counts.get(name) ?? 0 })),
+                dr.faceLayers ?? {},
+              ),
               skipped: d.skipped, drapedOn: flatLines.length && firstSurface ? firstSurface.name : null, closedLines,
             });
           }
@@ -315,14 +318,14 @@ export function App() {
     setDatasets((ds) =>
       ds.map((d) => {
         if (d.id !== id) return d;
-        return {
-          ...d,
-          layers: d.layers.map((l) => {
-            if (l.name !== layer) return l;
-            viewerRef.current!.setLayerVisible(id, layer, !l.visible);
-            return { ...l, visible: !l.visible };
-          }),
-        };
+        const layers = d.layers.map((l) => {
+          if (l.name !== layer) return l;
+          viewerRef.current!.setLayerVisible(id, layer, !l.visible);
+          return { ...l, visible: !l.visible };
+        });
+        // All 3D faces share one mesh: show it while any layer with faces is on.
+        if (layers.some((l) => l.faces)) viewerRef.current!.setSurfaceVisible(id, layers.some((l) => l.faces && l.visible));
+        return { ...d, layers };
       }),
     );
   };
@@ -893,6 +896,22 @@ function SceneLabel({ viewer, tick, at, text }: { viewer: React.RefObject<Viewer
   const s = viewer.current?.project(at);
   if (!s) return null;
   return <div className="scene-label" style={{ transform: `translate(${s.x}px, ${s.y}px)` }}>{text}</div>;
+}
+
+/** Add layers that only hold 3D faces (drawn as a surface, not linework) to the layer list. */
+export function mergeFaceLayers(
+  layers: { name: string; color: string; visible: boolean; count: number }[],
+  faceLayers: Record<string, number>,
+): { name: string; color: string; visible: boolean; count: number; faces?: boolean }[] {
+  const out: { name: string; color: string; visible: boolean; count: number; faces?: boolean }[] = layers.map((l) => ({ ...l }));
+  for (const [name, n] of Object.entries(faceLayers)) {
+    const existing = out.find((l) => l.name === name);
+    if (existing) {
+      existing.count += n;
+      existing.faces = true;
+    } else out.push({ name, color: '#b98652', visible: true, count: n, faces: true });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function isFlatZero(p: Float64Array) {

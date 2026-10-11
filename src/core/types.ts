@@ -42,6 +42,8 @@ export interface Drawing {
   polylines: Polyline[];
   points: PointFeature[];
   faces: Tin | null;
+  /** Number of 3D faces on each layer that has any (all faces share one TIN). */
+  faceLayers?: Record<string, number>;
   layers: string[];
 }
 

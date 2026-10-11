@@ -77,5 +77,6 @@ describe('DXF', () => {
     expect(d.points[0]).toEqual({ layer: 'CONTROL', x: 411000, y: 763500, z: 84.5 });
     expect(d.faces!.indices.length).toBe(3); // 4th vertex repeats the 3rd: one triangle
     expect(d.skipped).toEqual({ TEXT: 1 });
+    expect(d.faceLayers).toEqual({ TIN: 1 });
   });
 });

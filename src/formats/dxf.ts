@@ -72,6 +72,7 @@ export function parseDxf(text: string, name = 'Drawing'): Drawing & { skipped: R
   const faceIdx: number[] = [];
   const layers = new Set<string>();
   const skipped: Record<string, number> = {};
+  const faceLayers: Record<string, number> = {};
 
   const addLine = (layer: string, xyz: number[], closed: boolean) => {
     if (xyz.length >= 6) polylines.push({ layer, points: Float64Array.from(xyz), closed });
@@ -115,6 +116,7 @@ export function parseDxf(text: string, name = 'Drawing'): Drawing & { skipped: R
         const base = faceXYZ.length / 3;
         for (const v of vs) faceXYZ.push(v.x, v.y, v.z ?? 0);
         faceIdx.push(base, base + 1, base + 2);
+        faceLayers[layer] = (faceLayers[layer] ?? 0) + 1;
         const d = vs[3];
         const c = vs[2]!;
         if (d && (d.x !== c.x || d.y !== c.y || (d.z ?? 0) !== (c.z ?? 0))) faceIdx.push(base, base + 2, base + 3);
@@ -133,6 +135,7 @@ export function parseDxf(text: string, name = 'Drawing'): Drawing & { skipped: R
     points,
     faces: faceIdx.length ? { name: `${name} faces`, positions: Float64Array.from(faceXYZ), indices: Uint32Array.from(faceIdx) } : null,
     layers: [...layers].sort(),
+    faceLayers,
     skipped,
   };
 }

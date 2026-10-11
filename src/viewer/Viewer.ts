@@ -358,6 +358,13 @@ export class Viewer {
     this.requestRender();
   }
 
+  /** Show or hide just the surface part of a dataset (a drawing's 3D faces). */
+  setSurfaceVisible(id: string, on: boolean) {
+    const s = this.surfaces.get(id);
+    if (s) s.mesh.visible = on;
+    this.requestRender();
+  }
+
   setVisible(id: string, on: boolean) {
     const s = this.surfaces.get(id);
     if (s) {
